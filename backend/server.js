@@ -34,7 +34,12 @@ mongoose.connect(process.env.MONGO_URI)
 app.post('/api/clients', async (req, res) => {
     try {
         const { name, propertyName, contact, email, status } = req.body;
-        const newClient = new Client({ name, propertyName, contact, email, status });
+        
+        // Generate unique IDs
+        const clientId = 'CLT-' + require('crypto').randomBytes(3).toString('hex').toUpperCase();
+        const propertyId = 'PRP-' + require('crypto').randomBytes(3).toString('hex').toUpperCase();
+
+        const newClient = new Client({ clientId, propertyId, name, propertyName, contact, email, status });
         await newClient.save();
         res.status(201).json(newClient);
     } catch (error) {
