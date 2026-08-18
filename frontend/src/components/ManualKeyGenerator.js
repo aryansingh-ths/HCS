@@ -29,7 +29,7 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
   });
 
   useEffect(() => {
-    fetch('https://hcs-backend-jrvz.onrender.com/api/clients')
+    fetch('/api/clients')
       .then(res => res.json())
       .then(data => {
         setClients(data);
@@ -70,7 +70,7 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
     try {
       const durationMap = { '1 Year': 12, '3 Years': 36, 'Lifetime': 1200 };
       
-      const response = await fetch('https://hcs-backend-jrvz.onrender.com/api/licenses/generate', {
+      const response = await fetch('/api/licenses/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

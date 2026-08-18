@@ -23,7 +23,7 @@ export default function ActivationQueue({ onToast }) {
 
   // Fetch pending requests
   React.useEffect(() => {
-    fetch('https://hcs-backend-jrvz.onrender.com/api/clients')
+    fetch('/api/clients')
       .then(res => res.json())
       .then(data => {
         setClients(data);
@@ -33,7 +33,7 @@ export default function ActivationQueue({ onToast }) {
       })
       .catch(err => console.error('Failed to fetch clients:', err));
 
-    fetch('https://hcs-backend-jrvz.onrender.com/api/activation-requests')
+    fetch('/api/activation-requests')
       .then(res => res.json())
       .then(data => {
         setPending(data.map(req => ({
@@ -68,7 +68,7 @@ export default function ActivationQueue({ onToast }) {
         modules: formData.modules
       };
 
-      const response = await fetch(`https://hcs-backend-jrvz.onrender.com/api/activation-requests/${selectedRequest.id}/approve`, {
+      const response = await fetch(`/api/activation-requests/${selectedRequest.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

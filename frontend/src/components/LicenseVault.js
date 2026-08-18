@@ -20,7 +20,7 @@ export default function LicenseVault({ onToast }) {
   const [statusFilter, setStatusFilter] = useState('All Statuses');
 
   React.useEffect(() => {
-    fetch('https://hcs-backend-jrvz.onrender.com/api/licenses')
+    fetch('/api/licenses')
       .then(res => res.json())
       .then(data => {
         setLicenses(data.map(lic => ({

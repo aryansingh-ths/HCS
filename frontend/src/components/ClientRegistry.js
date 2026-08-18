@@ -16,7 +16,7 @@ export default function ClientRegistry({ onToast }) {
   });
 
   const fetchClients = () => {
-    fetch('https://hcs-backend-jrvz.onrender.com/api/clients')
+    fetch('/api/clients')
       .then(res => res.json())
       .then(data => setClients(data))
       .catch(err => console.error('Failed to fetch clients:', err));
@@ -29,7 +29,7 @@ export default function ClientRegistry({ onToast }) {
   const handleAddClient = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('https://hcs-backend-jrvz.onrender.com/api/clients', {
+      const response = await fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)

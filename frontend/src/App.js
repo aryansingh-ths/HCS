@@ -13,7 +13,7 @@ function MissionControl() {
 
   React.useEffect(() => {
     const fetchCount = () => {
-      fetch('https://hcs-backend-jrvz.onrender.com/api/activation-requests')
+      fetch('/api/activation-requests')
         .then(res => res.json())
         .then(data => setPendingCount(data.length))
         .catch(err => console.error('Failed to fetch queue count:', err));
