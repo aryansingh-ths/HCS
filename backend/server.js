@@ -229,5 +229,32 @@ app.get('/api/licenses', async (req, res) => {
 app.get('/health',(req,res)=>{
     res.status(200).json({ message: "OK" });
 })
+
+// ==========================================
+// 🌐 SERVE FRONTEND (For Hostinger / Production)
+// ==========================================
+const path = require('path');
+
+// Resolve the path to the frontend directory
+let distPath = path.resolve(__dirname, '..', 'frontend');
+
+// Safety check
+if (fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'))) {
+    console.log("-----------------------------------------");
+    console.log("Serving Frontend Build from:", distPath);
+    console.log("-----------------------------------------");
+    
+    // Serve the static files from the frontend directory
+    app.use(express.static(distPath));
+
+    // Catch-all route for React Router (only if it's not an API route)
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api/')) return next();
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+} else {
+    console.log("⚠️ Frontend build not found at:", distPath);
+}
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Control System Backend running on port ${PORT}`));
