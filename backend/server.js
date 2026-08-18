@@ -236,7 +236,7 @@ app.get('/health',(req,res)=>{
 const path = require('path');
 
 // Resolve the path to the frontend directory
-let distPath = path.resolve(__dirname, '..', 'frontend', 'build');
+let distPath = path.resolve(__dirname, '..', 'frontend', 'dist');
 
 // Safety check
 if (fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'))) {
