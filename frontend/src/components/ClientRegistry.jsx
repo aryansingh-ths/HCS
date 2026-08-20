@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Building2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Plus, Search, Building2, Edit2, Trash2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { apiFetch } from '../utils/api';
 
 export default function ClientRegistry({ onToast }) {
   const [clients, setClients] = useState([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [editingClientId, setEditingClientId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   const [formData, setFormData] = useState({
@@ -16,7 +18,7 @@ export default function ClientRegistry({ onToast }) {
   });
 
   const fetchClients = () => {
-    fetch('/api/clients')
+    apiFetch('/api/clients')
       .then(res => res.json())
       .then(data => setClients(data))
       .catch(err => console.error('Failed to fetch clients:', err));
@@ -26,23 +28,58 @@ export default function ClientRegistry({ onToast }) {
     fetchClients();
   }, []);
 
-  const handleAddClient = async (e) => {
+  const handleSaveClient = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
+      const isEditing = !!editingClientId;
+      const url = isEditing ? `/api/clients/${editingClientId}` : '/api/clients';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      const response = await apiFetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       });
-      if (!response.ok) throw new Error('Failed to add client');
-      onToast('Client registered successfully');
-      setIsAdding(false);
-      setFormData({ name: '', propertyName: '', contact: '', email: '', status: 'Inactive' });
+
+      if (!response.ok) throw new Error('Failed to save client');
+      onToast(isEditing ? 'Client updated successfully' : 'Client registered successfully');
+      handleCancel();
       fetchClients();
     } catch (error) {
       console.error(error);
-      onToast('Error registering client');
+      onToast('Error saving client');
     }
+  };
+
+  const handleEditClick = (client) => {
+    setEditingClientId(client._id);
+    setFormData({
+      name: client.name,
+      propertyName: client.propertyName,
+      contact: client.contact,
+      email: client.email,
+      status: client.status
+    });
+    setIsAdding(true);
+  };
+
+  const handleDeleteClient = async (id) => {
+    if (!window.confirm('Are you sure you want to permanently delete this client?')) return;
+    try {
+      const response = await apiFetch(`/api/clients/${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete client');
+      onToast('Client deleted successfully');
+      fetchClients();
+    } catch (error) {
+      console.error(error);
+      onToast('Error deleting client');
+    }
+  };
+
+  const handleCancel = () => {
+    setIsAdding(false);
+    setEditingClientId(null);
+    setFormData({ name: '', propertyName: '', contact: '', email: '', status: 'Inactive' });
   };
 
   const filteredClients = clients.filter(c => 
@@ -57,18 +94,20 @@ export default function ClientRegistry({ onToast }) {
           <h2 className="text-3xl font-black text-[#457B9D] tracking-tight">Client Registry</h2>
           <p className="hidden sm:block text-slate-500 font-bold mt-1 text-sm">Manage enterprise clients and their properties.</p>
         </div>
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="bg-[#CBA36E] hover:bg-[#B5905C] text-white px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_8px_20px_rgb(203,163,110,0.3)] transition-transform hover:scale-[1.02] active:scale-95"
-        >
-          <Plus size={16} /> Register Client
-        </button>
+        {!isAdding && (
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="bg-[#CBA36E] hover:bg-[#B5905C] text-white px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_8px_20px_rgb(203,163,110,0.3)] transition-transform hover:scale-[1.02] active:scale-95"
+          >
+            <Plus size={16} /> Register Client
+          </button>
+        )}
       </div>
 
       {isAdding ? (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-8 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.03)] border border-slate-50 mb-8 flex-1 overflow-y-auto hide-scrollbar">
-          <h3 className="font-black text-xl text-slate-800 mb-6 flex items-center gap-2"><Building2 size={20} className="text-[#457B9D]"/> New Client Registration</h3>
-          <form onSubmit={handleAddClient} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <h3 className="font-black text-xl text-slate-800 mb-6 flex items-center gap-2"><Building2 size={20} className="text-[#457B9D]"/> {editingClientId ? 'Update Client' : 'New Client Registration'}</h3>
+          <form onSubmit={handleSaveClient} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 ml-1">Company / Entity Name</label>
               <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full border-0 shadow-[0_4px_15px_rgb(0,0,0,0.03)] bg-[#F9F7F3] rounded-2xl px-5 py-3.5 text-sm focus:ring-2 focus:ring-[#CBA36E] outline-none font-bold text-slate-700" />
@@ -94,8 +133,10 @@ export default function ClientRegistry({ onToast }) {
             </div>
             <div className="hidden sm:block sm:col-span-1"></div>
             <div className="sm:col-span-2 flex justify-end gap-4 mt-2">
-              <button type="button" onClick={() => setIsAdding(false)} className="px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">Cancel</button>
-              <button type="submit" className="bg-[#457B9D] hover:bg-[#34617D] text-white px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-md">Register</button>
+              <button type="button" onClick={handleCancel} className="px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">Cancel</button>
+              <button type="submit" className="bg-[#457B9D] hover:bg-[#34617D] text-white px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-md">
+                {editingClientId ? 'Update Client' : 'Register'}
+              </button>
             </div>
           </form>
         </motion.div>
@@ -122,6 +163,7 @@ export default function ClientRegistry({ onToast }) {
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Property Name</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Contact</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,6 +193,24 @@ export default function ClientRegistry({ onToast }) {
                       }`}>
                         <span className={`w-2 h-2 rounded-full ${client.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
                         {client.status}
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleEditClick(client)}
+                          className="p-2 text-slate-400 hover:text-[#457B9D] hover:bg-[#457B9D]/10 rounded-xl transition-colors"
+                          title="Edit Client"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteClient(client._id)}
+                          className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                          title="Delete Client"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>

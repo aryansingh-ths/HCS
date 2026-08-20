@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Key, Copy, CheckCircle2, Loader2, Server, Globe } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 const availableModules = [
   { id: 'FRONT_DESK', label: 'Front Desk & CRM' },
@@ -29,7 +30,7 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
   });
 
   useEffect(() => {
-    fetch('/api/clients')
+    apiFetch('/api/clients')
       .then(res => res.json())
       .then(data => {
         setClients(data);
@@ -70,7 +71,7 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
     try {
       const durationMap = { '1 Year': 12, '3 Years': 36, 'Lifetime': 1200 };
       
-      const response = await fetch('/api/licenses/generate', {
+      const response = await apiFetch('/api/licenses/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

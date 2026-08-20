@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Server, CheckCircle2, ShieldAlert, X, ChevronRight, Activity, Globe } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 
 
@@ -23,7 +24,7 @@ export default function ActivationQueue({ onToast }) {
 
   // Fetch pending requests
   React.useEffect(() => {
-    fetch('/api/clients')
+    apiFetch('/api/clients')
       .then(res => res.json())
       .then(data => {
         setClients(data);
@@ -33,7 +34,7 @@ export default function ActivationQueue({ onToast }) {
       })
       .catch(err => console.error('Failed to fetch clients:', err));
 
-    fetch('/api/activation-requests')
+    apiFetch('/api/activation-requests')
       .then(res => res.json())
       .then(data => {
         setPending(data.map(req => ({
@@ -68,7 +69,7 @@ export default function ActivationQueue({ onToast }) {
         modules: formData.modules
       };
 
-      const response = await fetch(`/api/activation-requests/${selectedRequest.id}/approve`, {
+      const response = await apiFetch(`/api/activation-requests/${selectedRequest.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

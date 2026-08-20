@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, ShieldAlert, Ban } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 import ManualKeyGenerator from './ManualKeyGenerator';
-
-
 
 const availableModules = [
   { id: 'FRONT_DESK', label: 'Front Desk & CRM', short: 'FD' },
@@ -19,8 +18,8 @@ export default function LicenseVault({ onToast }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Statuses');
 
-  React.useEffect(() => {
-    fetch('/api/licenses')
+  const fetchLicenses = () => {
+    apiFetch('/api/licenses')
       .then(res => res.json())
       .then(data => {
         setLicenses(data.map(lic => ({
@@ -29,15 +28,31 @@ export default function LicenseVault({ onToast }) {
           client: lic.client?.name || 'Unknown',
           mac: lic.machineId,
           expiry: new Date(lic.expiresAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-          status: lic.status === 'ACTIVE' ? 'Active' : (lic.status === 'EXPIRED' ? 'Expired' : 'Expiring')
+          status: lic.status === 'ACTIVE' ? 'Active' : (lic.status === 'REVOKED' ? 'Revoked' : (lic.status === 'EXPIRED' ? 'Expired' : 'Expiring'))
         })));
       })
       .catch(err => {
         console.error('Failed to fetch licenses:', err);
         onToast('Failed to load license vault');
       });
-  }, [onToast]);
-  
+  };
+
+  React.useEffect(() => {
+    fetchLicenses();
+  }, []);
+
+  const handleRevokeLicense = async (id) => {
+    if (!window.confirm("WARNING: Are you sure you want to permanently REVOKE this license? This will lock out the client machine immediately.")) return;
+    try {
+      const response = await apiFetch(`/api/licenses/${id}/revoke`, { method: 'PUT' });
+      if (!response.ok) throw new Error('Failed to revoke');
+      onToast('License revoked successfully');
+      fetchLicenses();
+    } catch (err) {
+      console.error(err);
+      onToast('Error revoking license');
+    }
+  };
 
   const filteredLicenses = licenses.filter(lic => {
     const matchesSearch = lic.client.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -85,6 +100,7 @@ export default function LicenseVault({ onToast }) {
             <option>Active</option>
             <option>Expiring Soon</option>
             <option>Expired</option>
+            <option>Revoked</option>
           </select>
         </div>
 
@@ -98,6 +114,7 @@ export default function LicenseVault({ onToast }) {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Modules</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Expiry Date</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -120,11 +137,24 @@ export default function LicenseVault({ onToast }) {
                   <td className="px-6 py-5 text-sm font-bold text-slate-600">{lic.expiry}</td>
                   <td className="px-6 py-5">
                     <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                      lic.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'
+                      lic.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                      lic.status === 'Revoked' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                      'bg-amber-50 text-amber-600 border-amber-200'
                     }`}>
-                      <span className={`w-2 h-2 rounded-full ${lic.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                      <span className={`w-2 h-2 rounded-full ${lic.status === 'Active' ? 'bg-emerald-500' : lic.status === 'Revoked' ? 'bg-rose-500' : 'bg-amber-500'}`}></span>
                       {lic.status}
                     </div>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    {lic.status === 'Active' && (
+                      <button 
+                        onClick={() => handleRevokeLicense(lic.id)}
+                        className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                        title="Revoke License"
+                      >
+                        <Ban size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

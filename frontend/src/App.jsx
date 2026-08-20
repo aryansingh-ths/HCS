@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Key, Users, CheckCircle2, Activity, Menu, X } from 'lucide-react';
+import { Shield, Key, Users, CheckCircle2, Activity, Menu, X, LogOut, PieChart, FileText } from 'lucide-react';
+import DashboardOverview from './components/DashboardOverview';
 import ActivationQueue from './components/ActivationQueue';
 import LicenseVault from './components/LicenseVault';
 import ClientRegistry from './components/ClientRegistry';
+import AuditLogs from './components/AuditLogs';
+import Login from './components/Login';
+import { apiFetch } from './utils/api';
 
-function MissionControl() {
-  const [activeTab, setActiveTab] = useState('queue');
+function MissionControl({ onLogout }) {
+  const [activeTab, setActiveTab] = useState('overview');
   const [toastMessage, setToastMessage] = useState('');
   const [pendingCount, setPendingCount] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchCount = () => {
-      fetch('/api/activation-requests')
+      apiFetch('/api/activation-requests')
         .then(res => res.json())
         .then(data => setPendingCount(data.length))
         .catch(err => console.error('Failed to fetch queue count:', err));
@@ -41,13 +45,21 @@ function MissionControl() {
           </div>
         </div>
 
-        {/* Hamburger Menu Button */}
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-          className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-xl transition-colors"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onLogout}
+            className="hidden lg:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-rose-500 transition-colors"
+          >
+            <LogOut size={16} /> Logout
+          </button>
+          {/* Hamburger Menu Button */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+            className="lg:hidden p-2 text-slate-500 hover:bg-slate-50 rounded-xl transition-colors"
+          >
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
@@ -76,8 +88,12 @@ function MissionControl() {
             </div>
           </div>
 
-          <nav className="p-4 flex flex-col gap-2 mt-4">
+          <nav className="p-4 flex flex-col gap-2 mt-4 flex-1">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-2">Core Hub</p>
+            
+            <button onClick={() => { setActiveTab('overview'); setIsMobileMenuOpen(false); }} className={`flex justify-between items-center px-5 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'overview' ? 'bg-[#CBA36E] text-white shadow-lg shadow-[#CBA36E]/30' : 'text-slate-500 hover:bg-white hover:text-slate-800'}`}>
+              <span className="flex items-center gap-3"><PieChart size={16} /> System Overview</span>
+            </button>
             
             <button onClick={() => { setActiveTab('queue'); setIsMobileMenuOpen(false); }} className={`flex justify-between items-center px-5 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'queue' ? 'bg-[#CBA36E] text-white shadow-lg shadow-[#CBA36E]/30' : 'text-slate-500 hover:bg-white hover:text-slate-800'}`}>
               <span className="flex items-center gap-3"><Activity size={16} /> Activation Queue</span>
@@ -91,14 +107,32 @@ function MissionControl() {
             <button onClick={() => { setActiveTab('registry'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-5 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'registry' ? 'bg-[#CBA36E] text-white shadow-lg shadow-[#CBA36E]/30' : 'text-slate-500 hover:bg-white hover:text-slate-800'}`}>
               <Users size={16} /> Client Registry
             </button>
+            
+            <button onClick={() => { setActiveTab('audit'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-5 py-4 rounded-2xl transition-all font-black text-xs uppercase tracking-widest ${activeTab === 'audit' ? 'bg-[#CBA36E] text-white shadow-lg shadow-[#CBA36E]/30' : 'text-slate-500 hover:bg-white hover:text-slate-800'}`}>
+              <FileText size={16} /> System Audit
+            </button>
 
           </nav>
+
+          <div className="p-4 border-t border-slate-100 lg:hidden">
+            <button 
+              onClick={onLogout}
+              className="flex items-center gap-3 px-5 py-4 w-full rounded-2xl transition-all font-black text-xs uppercase tracking-widest text-rose-500 hover:bg-rose-50"
+            >
+              <LogOut size={16} /> Logout
+            </button>
+          </div>
         </div>
 
         {/* ─── MAIN CANVAS ─── */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#F5F0E6] relative">
           
           <AnimatePresence mode="wait">
+            {activeTab === 'overview' && (
+              <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute inset-0">
+                <DashboardOverview setActiveTab={setActiveTab} />
+              </motion.div>
+            )}
             {activeTab === 'queue' && (
               <motion.div key="queue" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute inset-0">
                 <ActivationQueue onToast={showToast} />
@@ -112,6 +146,11 @@ function MissionControl() {
             {activeTab === 'registry' && (
               <motion.div key="registry" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute inset-0">
                 <ClientRegistry onToast={showToast} />
+              </motion.div>
+            )}
+            {activeTab === 'audit' && (
+              <motion.div key="audit" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="absolute inset-0">
+                <AuditLogs />
               </motion.div>
             )}
           </AnimatePresence>
@@ -140,5 +179,24 @@ function MissionControl() {
 }
 
 export default function App() {
-  return <MissionControl />;
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('isLoggedIn') === 'true';
+  });
+
+  const handleLogin = () => {
+    sessionStorage.setItem('isLoggedIn', 'true');
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('isLoggedIn');
+    sessionStorage.removeItem('token');
+    setIsAuthenticated(false);
+  };
+
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
+  return <MissionControl onLogout={handleLogout} />;
 }
