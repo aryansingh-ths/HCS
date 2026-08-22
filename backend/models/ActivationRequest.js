@@ -46,7 +46,7 @@ const activationRequestSchema = new mongoose.Schema({
     },
     licensedModules: [{ 
         type: String,
-        enum: ['FRONT_DESK', 'DINING', 'HOUSEKEEPING', 'FINANCE', 'SALES', 'Travel']
+        enum: ['FRONT_DESK', 'DINING', 'HOUSEKEEPING', 'FINANCE', 'SALES', 'TRAVELS', 'ADMIN']
     }],
     validMonths: { 
         type: Number 

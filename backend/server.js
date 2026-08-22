@@ -79,6 +79,38 @@ const authMiddleware = (req, res, next) => {
 // ==========================================
 // 🏢 ROUTE: CLIENT MANAGEMENT
 // ==========================================
+app.post('/api/public/register-client', async (req, res) => {
+    try {
+        const { name, propertyName, contact, email } = req.body;
+        
+        // Check if email already exists
+        const existingClient = await Client.findOne({ email });
+        if (existingClient) {
+            return res.status(400).json({ error: "Client with this email already exists." });
+        }
+        
+        // Generate unique IDs
+        const clientId = 'CLT-' + require('crypto').randomBytes(3).toString('hex').toUpperCase();
+        const propertyId = 'PRP-' + require('crypto').randomBytes(3).toString('hex').toUpperCase();
+
+        const newClient = new Client({ 
+            clientId, 
+            propertyId, 
+            name, 
+            propertyName, 
+            contact, 
+            email, 
+            status: 'Inactive' // Initial status
+        });
+        await newClient.save();
+        await logAudit('CLIENT_REGISTERED', 'Client', newClient._id, 'System', 'Auto-registered', `new client: ${name}`);
+        res.status(201).json(newClient);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to register client." });
+    }
+});
+
 app.post('/api/clients', authMiddleware, async (req, res) => {
     try {
         const { name, propertyName, contact, email, status } = req.body;
@@ -153,7 +185,7 @@ app.post('/api/activation-requests', async (req, res) => {
 
 app.post('/api/activation-requests/:id/approve', authMiddleware, async (req, res) => {
     try {
-        const { clientId, validMonths, modules } = req.body;
+        const { clientId, expiresAt, modules } = req.body;
         const requestId = req.params.id;
 
         const request = await ActivationRequest.findById(requestId);
@@ -162,41 +194,50 @@ app.post('/api/activation-requests/:id/approve', authMiddleware, async (req, res
         const client = await Client.findById(clientId);
         if (!client) return res.status(404).json({ error: "Client not found" });
 
-        const expiresAt = new Date();
-        expiresAt.setMonth(expiresAt.getMonth() + parseInt(validMonths));
+        const expirationDate = new Date(expiresAt);
+        const exp = Math.floor(expirationDate.getTime() / 1000);
 
         const payload = {
             client: client.name,
             machine_id: request.hardwareId,
-            modules: modules
+            modules: modules,
+            exp: exp
         };
 
         const licenseKey = jwt.sign(payload, privateKey, {
-            algorithm: 'RS256',
-            expiresIn: `${validMonths * 30}d`
+            algorithm: 'RS256'
         });
 
         // Update Request
         request.status = 'APPROVED';
         request.clientId = clientId;
         request.licensedModules = modules;
-        request.validMonths = validMonths;
         request.generatedLicenseKey = licenseKey;
         await request.save();
+
+        // Auto-revoke previous active licenses for the same hardware ID
+        await License.updateMany(
+            { hardwareId: request.hardwareId, status: 'ACTIVE' },
+            { $set: { status: 'REVOKED' } }
+        );
 
         // Create License record
         const newLicense = new License({
             client: clientId,
             hardwareId: request.hardwareId,
             modules,
-            expiresAt,
+            expiresAt: expirationDate,
             licenseKey,
             networkInfo: request.networkInfo,
             hostname: request.hostname
         });
         await newLicense.save();
 
-        await logAudit('ACTIVATION_APPROVED', 'ActivationRequest', request._id, req.user.username, `Approved activation request for hardware ID: ${request.hardwareId}`);
+        // Auto-update Client status to Active
+        client.status = 'Active';
+        await client.save();
+
+        await logAudit('ACTIVATION_APPROVED', 'ActivationRequest', request._id, req.user.username, `Approved activation request for hardware ID: ${request.hardwareId}. Older licenses revoked.`);
 
         res.json({ message: "Approved successfully", licenseKey });
     } catch (error) {
@@ -228,9 +269,9 @@ app.get('/api/activation-requests/:hardwareId/status', async (req, res) => {
 // ==========================================
 app.post('/api/licenses/generate', authMiddleware, async (req, res) => {
     try {
-        const { clientId, machineId, validMonths, modules, networkInfo, hostname } = req.body;
+        const { clientId, machineId, expiresAt, modules, networkInfo, hostname } = req.body;
 
-        if (!clientId || !machineId || !validMonths || !modules || !hostname) {
+        if (!clientId || !machineId || !expiresAt || !modules || !hostname) {
             return res.status(400).json({ error: "Missing required fields." });
         }
         
@@ -240,40 +281,50 @@ app.post('/api/licenses/generate', authMiddleware, async (req, res) => {
         }
 
         // 1. Calculate precise expiration date for MongoDB tracking
-        const expiresAt = new Date();
-        expiresAt.setMonth(expiresAt.getMonth() + parseInt(validMonths));
+        const expirationDate = new Date(expiresAt);
+        const exp = Math.floor(expirationDate.getTime() / 1000);
 
         // 2. Build the Payload for the Local Hotel Server
         const payload = {
             client: client.name,
             machine_id: machineId,
-            modules: modules
+            modules: modules,
+            exp: exp
         };
 
         // 3. Cryptographically Sign the Key (Using RS256)
         const licenseKey = jwt.sign(payload, privateKey, {
-            algorithm: 'RS256',
-            expiresIn: `${validMonths * 30}d` // e.g., 365d
+            algorithm: 'RS256'
         });
 
-        // 4. Save Record to MongoDB
+        // 4. Auto-revoke previous active licenses for the same hardware ID
+        await License.updateMany(
+            { hardwareId: machineId, status: 'ACTIVE' },
+            { $set: { status: 'REVOKED' } }
+        );
+
+        // 5. Save Record to MongoDB
         const newLicense = new License({
             client: clientId,
             hardwareId: machineId,
             modules,
-            expiresAt,
+            expiresAt: expirationDate,
             licenseKey,
             networkInfo,
             hostname
         });
         await newLicense.save();
 
-        await logAudit('LICENSE_GENERATED', 'License', newLicense._id, req.user.username, `Generated manual license for machine: ${machineId}`);
+        // Auto-update Client status to Active
+        client.status = 'Active';
+        await client.save();
+
+        await logAudit('LICENSE_GENERATED', 'License', newLicense._id, req.user.username, `Generated manual license for machine: ${machineId}. Older licenses revoked.`);
 
         res.status(201).json({
             message: "License generated successfully",
             licenseKey,
-            expiresAt
+            expiresAt: expirationDate
         });
 
     } catch (error) {
@@ -301,7 +352,7 @@ app.get('/api/activation-requests', authMiddleware, async (req, res) => {
 app.get('/api/analytics', authMiddleware, async (req, res) => {
     try {
         const totalClients = await Client.countDocuments();
-        const pendingRequests = await ActivationRequest.countDocuments({ status: 'PENDING' });
+        const pendingRequests = await ActivationRequest.countDocuments({ status: 'Inactive' });
         
         const now = new Date();
         const thirtyDaysFromNow = new Date();
@@ -313,10 +364,17 @@ app.get('/api/analytics', authMiddleware, async (req, res) => {
         let revokedLicenses = 0;
         let expiringSoon = 0;
 
+        await Promise.all(licenses.map(async (lic) => {
+            if (lic.status === 'ACTIVE' && lic.expiresAt < now) {
+                lic.status = 'EXPIRED';
+                await lic.save();
+            }
+        }));
+
         licenses.forEach(lic => {
             if (lic.status === 'REVOKED') {
                 revokedLicenses++;
-            } else if (lic.expiresAt < now) {
+            } else if (lic.status === 'EXPIRED') {
                 // Technically expired
             } else if (lic.status === 'ACTIVE') {
                 activeLicenses++;
@@ -345,7 +403,17 @@ app.get('/api/analytics', authMiddleware, async (req, res) => {
 app.get('/api/licenses', authMiddleware, async (req, res) => {
     try {
         const licenses = await License.find().populate('client').sort({ createdAt: -1 });
-        res.json(licenses);
+        
+        const now = new Date();
+        const updatedLicenses = await Promise.all(licenses.map(async (lic) => {
+            if (lic.status === 'ACTIVE' && lic.expiresAt < now) {
+                lic.status = 'EXPIRED';
+                await lic.save();
+            }
+            return lic;
+        }));
+
+        res.json(updatedLicenses);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to fetch licenses" });
@@ -361,6 +429,11 @@ app.put('/api/licenses/:id/revoke', authMiddleware, async (req, res) => {
         if (!license) return res.status(404).json({ error: "License not found" });
 
         await License.updateOne({ _id: license._id }, { $set: { status: 'REVOKED' } });
+
+        // Auto-update Client status to Inactive
+        if (license.client) {
+            await Client.updateOne({ _id: license.client }, { $set: { status: 'Inactive' } });
+        }
 
         await logAudit('LICENSE_REVOKED', 'License', license._id, req.user?.username || 'System Admin', `Revoked license for hardware ID: ${license.hardwareId || 'Unknown'}`);
 
@@ -427,7 +500,7 @@ const path = require('path');
 // Resolve the path to the frontend directory
 let distPath = path.resolve(__dirname, '..', 'frontend', 'dist');
 
-// Safety check
+// safety check
 if (fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'))) {
     console.log("-----------------------------------------");
     console.log("Serving Frontend Build from:", distPath);

@@ -4,10 +4,13 @@ import { X, Key, Copy, CheckCircle2, Loader2, Server, Globe } from 'lucide-react
 import { apiFetch } from '../utils/api';
 
 const availableModules = [
-  { id: 'FRONT_DESK', label: 'Front Desk & CRM' },
-  { id: 'DINING', label: 'Dining & POS' },
-  { id: 'HOUSEKEEPING', label: 'Housekeeping Automation' },
-  { id: 'FINANCE', label: 'Finance & Ledgers' }
+  { id: 'FRONT_DESK', label: 'Front Desk' },
+  { id: 'DINING', label: 'Dining' },
+  { id: 'HOUSEKEEPING', label: 'Housekeeping' },
+  { id: 'SALES', label: 'Sales' },
+  { id: 'TRAVELS', label: 'Travels' },
+  { id: 'FINANCE', label: 'Finance' },
+  { id: 'ADMIN', label: 'Admin' }
 ];
 
 export default function ManualKeyGenerator({ onClose, onToast }) {
@@ -25,7 +28,7 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
     localIp: '0.0.0.0',
     city: 'Offline',
     country: 'Offline',
-    duration: '1 Year',
+    expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     modules: ['FRONT_DESK']
   });
 
@@ -69,15 +72,13 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
     setStep(3);
 
     try {
-      const durationMap = { '1 Year': 12, '3 Years': 36, 'Lifetime': 1200 };
-      
       const response = await apiFetch('/api/licenses/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: selectedClientId,
           machineId: formData.hardwareId,
-          validMonths: durationMap[formData.duration] || 12,
+          expiresAt: formData.expiresAt,
           modules: formData.modules,
           hostname: formData.hostname || "Offline-Generated-Server",
           networkInfo: {
@@ -188,13 +189,9 @@ export default function ManualKeyGenerator({ onClose, onToast }) {
                 <h4 className="text-[11px] font-black text-[#457B9D] uppercase tracking-widest mb-4 border-b border-slate-100 pb-2 flex items-center gap-2"><Globe size={14}/> License Configuration</h4>
                 
                 <div className="mb-5">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">License Duration</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {['1 Year', '3 Years', 'Lifetime'].map(dur => (
-                        <button type="button" key={dur} onClick={() => setFormData({...formData, duration: dur})} className={`py-3 text-xs font-black uppercase tracking-wider rounded-xl border transition-all ${formData.duration === dur ? 'bg-[#CBA36E] text-white border-[#CBA36E] shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                          {dur}
-                        </button>
-                      ))}
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">License Expiry Date</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      <input type="date" required value={formData.expiresAt} onChange={e => setFormData({...formData, expiresAt: e.target.value})} className="w-full border-0 shadow-[0_2px_10px_rgb(0,0,0,0.03)] bg-[#F9F7F3] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#CBA36E] outline-none font-bold text-slate-700" />
                     </div>
                 </div>
 

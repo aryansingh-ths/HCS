@@ -22,14 +22,23 @@ export default function LicenseVault({ onToast }) {
     apiFetch('/api/licenses')
       .then(res => res.json())
       .then(data => {
-        setLicenses(data.map(lic => ({
-          ...lic,
-          id: lic._id,
-          client: lic.client?.name || 'Unknown',
-          mac: lic.machineId,
-          expiry: new Date(lic.expiresAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-          status: lic.status === 'ACTIVE' ? 'Active' : (lic.status === 'REVOKED' ? 'Revoked' : (lic.status === 'EXPIRED' ? 'Expired' : 'Expiring'))
-        })));
+        setLicenses(data.map(lic => {
+          let computedStatus = 'Active';
+          if (lic.status === 'REVOKED') computedStatus = 'Revoked';
+          else if (lic.status === 'EXPIRED') computedStatus = 'Expired';
+          else if (new Date(lic.expiresAt) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)) {
+            computedStatus = 'Expiring Soon';
+          }
+
+          return {
+            ...lic,
+            id: lic._id,
+            client: lic.client?.name || 'Unknown',
+            mac: lic.hardwareId || lic.machineId || 'Unknown',
+            expiry: new Date(lic.expiresAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+            status: computedStatus
+          };
+        }));
       })
       .catch(err => {
         console.error('Failed to fetch licenses:', err);
@@ -139,14 +148,19 @@ export default function LicenseVault({ onToast }) {
                     <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
                       lic.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
                       lic.status === 'Revoked' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                      lic.status === 'Expiring Soon' ? 'bg-orange-50 text-orange-600 border-orange-200' :
                       'bg-amber-50 text-amber-600 border-amber-200'
                     }`}>
-                      <span className={`w-2 h-2 rounded-full ${lic.status === 'Active' ? 'bg-emerald-500' : lic.status === 'Revoked' ? 'bg-rose-500' : 'bg-amber-500'}`}></span>
+                      <span className={`w-2 h-2 rounded-full ${
+                        lic.status === 'Active' ? 'bg-emerald-500' : 
+                        lic.status === 'Revoked' ? 'bg-rose-500' : 
+                        lic.status === 'Expiring Soon' ? 'bg-orange-500' : 'bg-amber-500'
+                      }`}></span>
                       {lic.status}
                     </div>
                   </td>
                   <td className="px-6 py-5 text-right">
-                    {lic.status === 'Active' && (
+                    {(lic.status === 'Active' || lic.status === 'Expiring Soon') && (
                       <button 
                         onClick={() => handleRevokeLicense(lic.id)}
                         className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"

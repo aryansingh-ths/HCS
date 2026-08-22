@@ -6,10 +6,13 @@ import { apiFetch } from '../utils/api';
 
 
 const availableModules = [
-  { id: 'FRONT_DESK', label: 'Front Desk & CRM' },
-  { id: 'DINING', label: 'Dining & POS' },
-  { id: 'HOUSEKEEPING', label: 'Housekeeping Automation' },
-  { id: 'FINANCE', label: 'Finance & Ledgers' }
+  { id: 'FRONT_DESK', label: 'Front Desk' },
+  { id: 'DINING', label: 'Dining' },
+  { id: 'HOUSEKEEPING', label: 'Housekeeping' },
+  { id: 'SALES', label: 'Sales' },
+  { id: 'TRAVELS', label: 'Travels' },
+  { id: 'FINANCE', label: 'Finance' },
+  { id: 'ADMIN', label: 'Admin' }
 ];
 
 export default function ActivationQueue({ onToast }) {
@@ -20,7 +23,16 @@ export default function ActivationQueue({ onToast }) {
   const [clients, setClients] = useState([]);
 
   // Drawer state
-  const [formData, setFormData] = useState({ clientId: '', modules: ['FRONT_DESK'], duration: '1 Year' });
+  const [formData, setFormData] = useState({ clientId: '', modules: ['FRONT_DESK'], expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] });
+
+  const handleToggleModule = (moduleId) => {
+    setFormData(prev => ({
+      ...prev,
+      modules: prev.modules.includes(moduleId)
+        ? prev.modules.filter(m => m !== moduleId)
+        : [...prev.modules, moduleId]
+    }));
+  };
 
   // Fetch pending requests
   React.useEffect(() => {
@@ -61,11 +73,9 @@ export default function ActivationQueue({ onToast }) {
           throw new Error('Please select a client first');
       }
 
-      const durationMap = { '1 Year': 12, '3 Years': 36, 'Lifetime': 1200 };
-      
       const payload = {
         clientId: formData.clientId,
-        validMonths: durationMap[formData.duration] || 12,
+        expiresAt: formData.expiresAt,
         modules: formData.modules
       };
 
@@ -208,13 +218,9 @@ export default function ActivationQueue({ onToast }) {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Duration</label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {['1 Year', '3 Years', 'Lifetime'].map(dur => (
-                        <button key={dur} onClick={() => setFormData({...formData, duration: dur})} className={`py-3 text-xs font-black uppercase tracking-wider rounded-xl border transition-all ${formData.duration === dur ? 'bg-[#CBA36E] text-white border-[#CBA36E] shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                          {dur}
-                        </button>
-                      ))}
+                    <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-3">Expiry Date</label>
+                    <div className="grid grid-cols-1 gap-3">
+                      <input type="date" required value={formData.expiresAt} onChange={e => setFormData({...formData, expiresAt: e.target.value})} className="w-full border-0 shadow-[0_2px_10px_rgb(0,0,0,0.03)] bg-[#F9F7F3] rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#CBA36E] outline-none font-bold text-slate-700" />
                     </div>
                   </div>
 
@@ -227,6 +233,7 @@ export default function ActivationQueue({ onToast }) {
                             {formData.modules.includes(mod.id) && <CheckCircle2 size={14} className="text-white" />}
                           </div>
                           <span className={`text-sm font-bold ${formData.modules.includes(mod.id) ? 'text-slate-800' : 'text-slate-500'}`}>{mod.label}</span>
+                          <input type="checkbox" className="hidden" checked={formData.modules.includes(mod.id)} onChange={() => handleToggleModule(mod.id)} />
                         </label>
                       ))}
                     </div>

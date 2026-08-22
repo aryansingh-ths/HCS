@@ -7,6 +7,7 @@ const auditLogSchema = new mongoose.Schema({
         enum: [
             'LOGIN_SUCCESS',
             'LOGIN_FAILED',
+            'CLIENT_REGISTERED',
             'CLIENT_CREATED',
             'CLIENT_UPDATED',
             'CLIENT_DELETED',
